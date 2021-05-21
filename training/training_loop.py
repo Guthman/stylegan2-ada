@@ -24,6 +24,7 @@ from training import dataset
 # Select size and contents of the image snapshot grids that are exported
 # periodically during training.
 
+
 def setup_snapshot_image_grid(training_set):
     gw = np.clip(7680 // training_set.shape[2], 7, 32)
     gh = np.clip(4320 // training_set.shape[1], 4, 32)
@@ -133,11 +134,16 @@ def training_loop(
     D.print_layers()
 
     print('Exporting sample images...')
+    print('Getting grid_size, grid_reals, grid_labels...')
     grid_size, grid_reals, grid_labels = setup_snapshot_image_grid(training_set)
-    save_image_grid(grid_reals, os.path.join(run_dir, 'reals.jpg'), drange=[0,255], grid_size=grid_size)
+    print('Saving image grid...')
+    save_image_grid(grid_reals, os.path.join(run_dir, 'reals.jpg'), drange=[0, 255], grid_size=grid_size)
+    print('Getting grid_latents...')
     grid_latents = np.random.randn(np.prod(grid_size), *G.input_shape[1:])
+    print('Getting grid_fakes...')
     grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, minibatch_size=minibatch_gpu)
-    save_image_grid(grid_fakes, os.path.join(run_dir, 'fakes_init.jpg'), drange=[-1,1], grid_size=grid_size)
+    print('Saving image grid...')
+    save_image_grid(grid_fakes, os.path.join(run_dir, 'fakes_init.jpg'), drange=[-1, 1], grid_size=grid_size)
 
     print(f'Replicating networks across {num_gpus} GPUs...')
     G_gpus = [G]
@@ -218,7 +224,7 @@ def training_loop(
         metrics.append(metric)
 
     print(f'Training for {total_kimg} kimg...')
-    print()
+    # print()
     if progress_fn is not None:
         progress_fn(0, total_kimg)
     tick_start_time = time.time()
@@ -240,7 +246,8 @@ def training_loop(
         epochs = float(100 * cur_nimg / (total_kimg * 1000)) # 100 total top k "epochs" in total_kimg
 
         # Run training ops.
-        for _repeat_idx in range(minibatch_repeats):
+        print('Run training ops')
+        for _repeat_idx in tqdm(range(minibatch_repeats)):
             rounds = range(0, minibatch_size, minibatch_gpu * num_gpus)
             run_G_reg = (lazy_regularization and running_mb_counter % G_reg_interval == 0)
             run_D_reg = (lazy_regularization and running_mb_counter % D_reg_interval == 0)
@@ -274,6 +281,7 @@ def training_loop(
                 aug.run_validation(minibatch_size=minibatch_size)
 
         # Tune augmentation parameters.
+        print('Tune augmentation parameters')
         if aug is not None:
             aug.tune(minibatch_size * minibatch_repeats)
 
@@ -323,7 +331,7 @@ def training_loop(
             tick_start_time = time.time()
             maintenance_time = tick_start_time - tick_end_time
 
-    print()
+    # print()
     print('Exiting...')
     summary_log.close()
     training_set.close()
